@@ -3,7 +3,7 @@ OPERATORS = {
     " ": (2, lambda x, y: x and y),
 }
 
-
+#?  https://habr.com/ru/articles/273253/
 def eval_(formula):
     def parse(formula_string):
         number = ""
