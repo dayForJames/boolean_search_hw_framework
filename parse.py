@@ -3,7 +3,7 @@ OPERATORS = {
     " ": (2, lambda x, y: x and y),
 }
 
-#?  https://habr.com/ru/articles/273253/
+# ?  https://habr.com/ru/articles/273253/
 def eval_(formula):
     def parse(formula_string):
         number = ""
@@ -54,4 +54,36 @@ def eval_(formula):
 
     return calc(shunting_yard(parse(formula)))
 
-print(eval_("12 0|3"))
+# print(eval_("12 0|3"))
+
+def tokenize(request : str) -> list[str]:
+    ru_en_symbols = (
+        "abcdefghijklmnopqrstuvwxyz"
+        + "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
+        + ("abcdefghijklmnopqrstuvwxyz" + "абвгдеёжзийклмнопрстуфхцчшщъыьэюя").upper()
+    )
+    operands = " |()"
+
+    token_list = []
+    i = 0
+
+    while i < len(request):
+        if request[i] not in operands:
+            word = ""
+            while request[i] not in operands and i < len(request):
+                word += request[i]
+
+                i += 1
+
+            token_list.append(word)
+
+        if request[i] in operands:
+            token_list.append(request[i])
+            i += 1
+
+    return token_list
+
+request = 'Иван Андреевич|(Кот (Матроскин|Белый))'
+
+
+print(tokenize(request))

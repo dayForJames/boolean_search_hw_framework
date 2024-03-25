@@ -136,8 +136,8 @@ def main():
     # Build index.
     index = Index(args.docs_file)
     
-    index.MAP()
-    index.SORT()
+    # index.MAP()
+    # index.SORT()
 
     # Process queries.
     search_results = SearchResults()
