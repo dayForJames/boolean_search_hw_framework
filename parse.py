@@ -57,11 +57,6 @@ def eval_(formula):
 # print(eval_("12 0|3"))
 
 def tokenize(request : str) -> list[str]:
-    ru_en_symbols = (
-        "abcdefghijklmnopqrstuvwxyz"
-        + "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
-        + ("abcdefghijklmnopqrstuvwxyz" + "абвгдеёжзийклмнопрстуфхцчшщъыьэюя").upper()
-    )
     operands = " |()"
 
     token_list = []
@@ -70,20 +65,19 @@ def tokenize(request : str) -> list[str]:
     while i < len(request):
         if request[i] not in operands:
             word = ""
-            while request[i] not in operands and i < len(request):
+            while i < len(request) and request[i] not in operands:
                 word += request[i]
 
                 i += 1
 
             token_list.append(word)
 
-        if request[i] in operands:
+        elif request[i] in operands:
             token_list.append(request[i])
             i += 1
 
     return token_list
 
-request = 'Иван Андреевич|(Кот (Матроскин|Белый))'
-
+request = "0 (16|XVI) 0 (8T|8 T|8 Т|8Т) T"
 
 print(tokenize(request))

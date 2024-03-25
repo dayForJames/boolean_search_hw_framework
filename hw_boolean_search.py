@@ -104,8 +104,32 @@ class Index:
 
 class QueryTree:
     def __init__(self, qid, query):
-        # TODO: parse query and create query tree
-        pass
+        self._query = query
+        self._qid = qid
+        self._token_list = self.tokenizer(self._query)
+
+    def tokenizer(self, request : str) -> list[str]:
+        '''Take str request and return list of lexems and operands for next request processing'''
+    
+        operands = " |()"
+        token_list = []
+        i = 0
+
+        while i < len(request):
+            if request[i] not in operands:
+                word = ""
+                while request[i] not in operands and i < len(request):
+                    word += request[i]
+
+                    i += 1
+
+                token_list.append(word)
+
+            elif request[i] in operands:
+                token_list.append(request[i])
+                i += 1
+
+        return token_list
 
     def search(self, index):
         # TODO: lookup query terms in the index and implement boolean search logic
