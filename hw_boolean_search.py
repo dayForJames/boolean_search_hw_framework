@@ -7,19 +7,36 @@ import sys
 import json
 import numpy as np
 
+from csv import writer, reader
+
 
 class Index:
     def __init__(self, index_file):
         self._index_file: str = index_file
         self._inverted_index: dict = {}
         self._line_count = 0
-        self._map_file = './data/MAP_FILE.txt'
+        self._map_file = "./data/MAP_FILE.txt"
         self._inv_index_file = "./data/inverse_index.json"
+
+    def getFromFile(self):
+        with open(self._inv_index_file, "r", encoding="utf-8") as f:
+            self._inverted_index = json.load(f)
+
+    def __getitem__(self, token):
+        if token in self._inverted_index.keys():
+            return self._inverted_index[token]
+
+        return []
+
+    def get(self, key) -> list:
+        if key in self._inverted_index.keys():
+            return self._inverted_index[key]
+
+        return []
 
     def process(self):
         with open(self._index_file, "r", encoding="utf-8") as doc:
             for line in doc:
-
                 file_id, file_title, file = line.split("\t")
 
                 file_id = file_id.strip(" \n")
@@ -27,234 +44,199 @@ class Index:
                 file = file_title + " " + file.strip(" \n")
 
                 for word in file.split(" "):
-                    # is_valid = True
+                    w = word.strip(" \t\n").lower()
+                    if w not in self._inverted_index.keys():
+                        self._inverted_index[w] = set()
 
-                    #!  Russian word are missed
-                    #!  Maybe should rewrite
-                    # for s in word:
-                    #     if not s.isascii():
-                    #         is_valid = False
-                    #         break
+                    self._inverted_index[w].add(int(file_id[1:]))
 
-                    # if is_valid:
-                    if word not in self._inverted_index.keys():
-                        self._inverted_index[word] = set()
+        for key in self._inverted_index.keys():
+            self._inverted_index[key] = list(self._inverted_index[key])
 
-                        self._inverted_index[word].add(int(file_id[1:]))
-
-            for key in self._inverted_index.keys():
-                self._inverted_index[key] = list(self._inverted_index[key])
-
-            with open(self._inv_index_file, "w", encoding="utf-8") as f:
-                json.dump(
-                    self._inverted_index,
-                )
-
-    def MAP(self):
-        with open(self._index_file, "r", encoding="utf-8") as doc:
-            with open(self._map_file, "w", encoding="utf-8") as map_file:
-                for line in doc:
-                    file_id, file_title, file = line.split("\t")
-
-                    file_id = file_id.strip(" \n")
-                    file_title = file_title.strip(" \n")
-                    file = file_title + " " + file.strip(" \n")
-                    
-                    for word in file.split(' '):
-                        # is_valid = True
-                        #!  Russian word are missed
-                        # #!  Maybe should rewrite
-                        # for s in word:
-                        #     if not s.isascii():
-                        #         is_valid = False
-                        #         break
-
-                        # if is_valid:
-                        map_file.write(word + ' ' + file_id + '\n')
+        with open(self._inv_index_file, "w", encoding="utf-8") as f:
+            json.dump(self._inverted_index, f, ensure_ascii=False)
 
 
-    def _count_file_lines(self, file : str) -> int:
-        count = 0
+class Tokenizer:
+    def __init__(self, request: str):
+        self._infixExpr = request
+        self._priority = {"(": 0, "|": 1, " ": 3}
 
-        with open(file, 'r', encoding='utf-8') as f:
-            for line in f:
-                count += 1
+    def tokens2list(self, tokens: list, index: Index) -> list:
+        result = tokens.copy()
 
-        return count
+        for i in range(len(tokens)):
+            if tokens[i] not in ("(", ")", "|", " "):
+                result[i] = index.get(tokens[i])
 
+        return result
 
-    def SORT(self):
-        FILE_BUF_COUNT = 50
+    def calc_poliz(self, tokens: list) -> str:
+        stack = []
+        result = []
 
-        self._line_count = self._count_file_lines(self._map_file)
+        for i in range(len(tokens)):
+            c = tokens[i]
 
-        size = self._line_count // FILE_BUF_COUNT
-        last_size = self._line_count - size * FILE_BUF_COUNT
+            if "()| ".find(c) == -1:
+                result.append(c)
 
-        line_ind = 0
+            elif c == "(":
+                stack.append(c)
+            elif c == ")":
+                while len(stack) > 0 and stack[-1] != "(":
+                    result.append(stack.pop())
 
-        size_arr = np.full_like(np.zeros(FILE_BUF_COUNT), size)
-        if last_size != 0:
-            size_arr[-1] = last_size
+                stack.pop()
+            elif c in self._priority.keys():
+                while len(stack) > 0 and (
+                    self._priority[stack[-1]] >= self._priority[c]
+                ):
+                    result.append(stack.pop())
 
-        print(size_arr)
+                stack.append(c)
 
-        # for part_i in range()
+        while len(stack) > 0:
+            result.append(stack.pop())
 
-def intersection(A : list[int], B : list[int]) -> list[int]:
-    i = j = 0
-    result = []
+        return result
 
-    A_ = sorted(A)
-    B_ = sorted(B)
+    def tokenize(self) -> list[str]:
+        """Take str request and return list of lexems and operands for next request processing"""
 
-    while i < len(A_) and j < len(B_):
-        if A_[i] < B_[j]:
-            i += 1
-        elif A_[i] > B_[j]:
-            j += 1
-        else:
-            result.append(A_[i])
-            i += 1
-            j += 1
-
-    addition = []
-
-    if i < len(A_):
-        addition = A_[i:]
-    elif j < len(B_):
-        addition = B_[j:]
-
-    if len(addition) > 0:
-        for el in addition:
-            if el in A_ and el in B_ and el not in result:
-                result.append(el)
-
-    return result
-
-
-def union(A : list[int], B : list[int]) -> list[int]:
-    i = j = 0
-    result = []
-
-    A_ = A.copy()
-    A_ = sorted(A_)
-
-    B_ = B.copy()
-    B_ = sorted(B_)
-
-    while i < len(A_) and j < len(B_):
-        if A_[i] < B_[j]:
-            result.append(A_[i])
-            i += 1
-        elif A_[i] > B_[j]:
-            result.append(B_[j])
-            j += 1
-        else:
-            result.append(B_[j])
-            i += 1
-            j += 1
-
-    addition = []
-
-    if j < len(B_):
-        addition = B_[j:]
-    elif i < len(A_):
-        addition = A_[i:]
-
-    if len(addition) > 0:
-        for el in addition:
-            if el not in result:
-                result.append(el)
-
-    return result
-
-OPERATORS = {
-    "|": (1, lambda x, y: union(x, y)),
-    " ": (2, lambda x, y: intersection(x, y)),
-}
-
-class QueryTree:
-    def __init__(self, qid, query):
-        self._query = query
-        self._qid = qid
-        self._token_list = self.tokenizer(self._query)
-    
-
-    def tokenizer(self, request : str) -> list[str]:
-        '''Take str request and return list of lexems and operands for next request processing'''
-    
         operands = " |()"
         token_list = []
         i = 0
 
-        while i < len(request):
-            if request[i] not in operands:
+        while i < len(self._infixExpr):
+            if self._infixExpr[i] not in operands:
                 word = ""
-                while request[i] not in operands and i < len(request):
-                    word += request[i]
+                while i < len(self._infixExpr) and self._infixExpr[i] not in operands:
+                    word += self._infixExpr[i]
 
                     i += 1
 
-                token_list.append(word)
+                token_list.append(word.lower())
 
-            elif request[i] in operands:
-                token_list.append(request[i])
+            elif self._infixExpr[i] in operands:
+                token_list.append(self._infixExpr[i])
                 i += 1
 
         return token_list
-    
-    def shunting_yard(parsed_formula):
-        stack = []
-        for token in parsed_formula:
-            if token in OPERATORS:
-                while (
-                    stack
-                    and stack[-1] != "("
-                    and OPERATORS[token][0] <= OPERATORS[stack[-1]][0]
-                ):
-                    yield stack.pop()
-                stack.append(token)
-            elif token == ")":
-                while stack:
-                    x = stack.pop()
-                    if x == "(":
-                        break
-                    yield x
-            elif token == "(":
-                stack.append(token)
+
+    def and_split(self, tokens: list) -> list:
+        splits = []
+
+        first_pos = 0
+        ind = 0
+
+        brack_balance = 0
+
+        while ind < len(tokens):
+            if tokens[ind] == "(":
+
+                brack_balance += 1
+                ind += 1
+
+            elif tokens[ind] == ")":
+                brack_balance -= 1
+                ind += 1
+
+            elif tokens[ind] == " " and (brack_balance == 0):
+                splits.append(tokens[first_pos:ind])
+                first_pos = ind + 1
+                ind += 1
+
+            elif tokens[ind] == "|":
+                ind += 1
+
             else:
-                yield token
-        while stack:
-            yield stack.pop()
+                ind += 1
+                pass  # we don't make splits insidde
+
+        splits.append(tokens[first_pos:ind])
+
+        return splits
 
 
-    def calc(polish, index):
+class QueryTree:
+
+    def __init__(self, qid, query, docids):
+        self._query = query
+        self._qid = qid
+        self._tokenizer = Tokenizer(query)
+        self._docids = docids
+
+    def getRelevantFiles(self, poliz):
         stack = []
-        for token in polish:
-            if token in OPERATORS:
-                y, x = stack.pop(), stack.pop()
-                answ = OPERATORS[token][1](index[x], index[y])
-                index['ANSWER'] = answ
-                stack.append("ANSWER")
+
+        for el in poliz:
+            if not isinstance(el, str):
+                stack.append(el)
             else:
-                stack.append(token)
-        return index[stack[0]]
-    
+                operand1 = stack.pop()
+                operand2 = stack.pop()
+
+                result = []
+
+                if el == "|":
+                    result = operand1 + operand2
+                else:
+                    result = []
+
+                    for o in operand1:
+                        if o in operand2:
+                            result.append(o)
+
+                stack.append(result)
+
+        return list(stack.pop())
 
     def search(self, index):
-        # TODO: lookup query terms in the index and implement boolean search logic
-        pass
+        tokens = self._tokenizer.tokenize()
+        split_and = self._tokenizer.and_split(tokens)
+
+        relevant_count = {str(docid): 0 for docid in self._docids}
+        relevant_mark = len(split_and) * 0.4
+
+        for split in split_and:
+            poliz = self._tokenizer.calc_poliz(split)
+            poliz_list = self._tokenizer.tokens2list(poliz, index)
+
+            res = self.getRelevantFiles(poliz_list)
+
+            for docid in relevant_count.keys():
+                if int(docid) in res:
+                    relevant_count[docid] += 1
+
+        ans = {}
+
+        for docid in relevant_count.keys():
+            ans[docid] = 1 if relevant_count[docid] >= relevant_mark else 0
+
+        return ans
 
 
 class SearchResults:
-    def add(self, found):
-        # TODO: add next query's results
-        pass
+    def __init__(self):
+        self._results = {}
+
+    def add(self, found, qid):
+        self._results[qid] = found
 
     def print_submission(self, objects_file, submission_file):
-        # TODO: generate submission file
-        pass
+        with open(objects_file, mode="r", encoding="utf-8") as obj_file:
+            obj_file.readline()
+
+            with open(submission_file, mode="w", encoding="utf-8") as sub_file:
+                sub_file.write("ObjectId,Relevance\n")
+
+                for obj_line in obj_file:
+                    obj_id, query_id, doc_id = obj_line.strip().split(",")
+
+                    sub_file.write(
+                        f"{obj_id},{self._results[query_id][str(int(doc_id[1:]))]}\n"
+                    )
 
 
 def main():
@@ -270,25 +252,38 @@ def main():
 
     # Build index.
     index = Index(args.docs_file)
-    
-    # index.MAP()
-    # index.SORT()
+    # index.process()
+    index.getFromFile()
 
-    # Process queries.
     search_results = SearchResults()
+
+    query_docid = {}
+
+    with codecs.open(args.objects_file, mode="r", encoding="utf-8") as objects_file:
+        objects_file.readline()
+
+        for line in objects_file:
+            obj_id, query_id, doc_id = line.strip().split(",")
+
+            if query_docid.get(query_id) is None:
+                query_docid[query_id] = []
+
+            query_docid[query_id].append(int(doc_id[1:]))
+
     with codecs.open(args.queries_file, mode="r", encoding="utf-8") as queries_fh:
         for line in queries_fh:
             fields = line.rstrip("\n").split("\t")
-            qid = int(fields[0])
+            qid = fields[0]
             query = fields[1]
 
             # Parse query.
-            query_tree = QueryTree(qid, query)
+            if query_docid.get(qid) is not None:
+                query_tree = QueryTree(qid, query, query_docid[qid])
 
-            # Search and save results.
-            search_results.add(query_tree.search(index))
+                # Search and save results.
+                search_results.add(query_tree.search(index), qid)
 
-    # Generate submission file.
+    # # Generate submission file.
     search_results.print_submission(args.objects_file, args.submission_file)
 
 
